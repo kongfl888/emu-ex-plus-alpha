@@ -11,6 +11,7 @@ jobs:
       uses: actions/checkout@v7
       with:
         fetch-depth: 0
+
     - name: Decode debug keystore
       env:
         DEBUG_KEYSTORE: ${{ secrets.DEBUG_KEYSTORE }}
@@ -23,19 +24,33 @@ jobs:
           mkdir -p ~/.android
           mv .debug.keystore ~/.android/debug.keystore
         fi
-    - name: Install build dependencies
+
+    - name: Install build dependencies + ccache
       run: |
         sudo apt-get update
-        sudo apt-get install -y --no-install-recommends autoconf automake autopoint bash gcc-arm-linux-gnueabi file gawk gettext git libtool libtool-bin make nasm pkg-config unzip wget
+        sudo apt-get install -y --no-install-recommends \
+          autoconf automake autopoint bash gcc-arm-linux-gnueabi file gawk \
+          gettext git libtool libtool-bin make nasm pkg-config unzip wget ccache
+
+    - name: Restore ccache
+      uses: actions/cache@v6
+      with:
+        path: ~/.ccache
+        key: ${{ runner.os }}-ccache-${{ github.ref_name }}
+        restore-keys: |
+          ${{ runner.os }}-ccache-
+
     - name: Install Latest CMake
       uses: lukka/get-cmake@latest
       with:
         cmakeVersion: '4.3.2'
+
     - name: Set up JDK 25
       uses: actions/setup-java@v6
       with:
         distribution: 'temurin'
         java-version: '25'
+
     - name: Set up environment
       run: |
         mkdir imagine-sdk
@@ -50,20 +65,44 @@ jobs:
         echo "IMAGINE_PATH=${{ github.workspace }}/imagine" >> "$GITHUB_ENV_FILE"
         echo "IMAGINE_SDK_PATH=${{ github.workspace }}/imagine-sdk" >> "$GITHUB_ENV_FILE"
         echo "COMMIT_PREFIX=$(echo ${{ github.sha }} | cut -c1-8)" >> "$GITHUB_ENV_FILE"
+        # ccache env
+        echo "CCACHE_DIR=${HOME}/.ccache" >> "$GITHUB_ENV_FILE"
+        echo "CCACHE_MAXSIZE=5G" >> "$GITHUB_ENV_FILE"
+        echo "CCACHE_COMPRESS=1" >> "$GITHUB_ENV_FILE"
+        echo "CCACHE_COMPRESSLEVEL=6" >> "$GITHUB_ENV_FILE"
+        echo "CCACHE_SLOPPINESS=include_file_ctime,include_file_mtime" >> "$GITHUB_ENV_FILE"
         cat "$GITHUB_ENV_FILE" >> $GITHUB_ENV
+
+    - name: Show ccache stats before build
+      run: ccache -s
+
     - name: Run script
       working-directory: imagine/bundle/all
       run: |
+        export CC="ccache gcc"
+        export CXX="ccache g++"
+        export NDK_CC="ccache clang"
+        export NDK_CXX="ccache clang++"
         ./makeAll-android.sh install
       shell: bash
+
     - name: Build environment
       run: |
+        export CC="ccache gcc"
+        export CXX="ccache g++"
+        export NDK_CC="ccache clang"
+        export NDK_CXX="ccache clang++"
         $IMAGINE_PATH/android.sh config
         $IMAGINE_PATH/android.sh installLinks --config Release
         $EMUFRAMEWORK_PATH/android.sh config
         $EMUFRAMEWORK_PATH/android.sh installLinks --config Release
+
+    - name: Show ccache stats after base build
+      run: ccache -s
+
     - name: Keep cache small
       run: rm -rf .git
+
     - name: Save cache
       uses: actions/cache/save@v6
       with:
@@ -78,121 +117,218 @@ jobs:
       matrix:
         image: ["2600.emu", "C64.emu", "GBA.emu", "GBC.emu", "Lynx.emu", "MD.emu", "MSX.emu", "NEO.emu", "NES.emu", "NGP.emu", "PCE.emu", "Snes9x", "Snes9x-1.43", "Swan.emu", "Saturn.emu"]
     steps:
-    - name: Install build dependencies
+    - name: Install build dependencies + ccache
       run: |
         sudo apt-get update
-        sudo apt-get install -y --no-install-recommends autoconf automake autopoint bash gcc-arm-linux-gnueabi file gawk gettext git libtool libtool-bin make nasm pkg-config unzip wget
+        sudo apt-get install -y --no-install-recommends \
+          autoconf automake autopoint bash gcc-arm-linux-gnueabi file gawk \
+          gettext git libtool libtool-bin make nasm pkg-config unzip wget ccache
+
+    - name: Restore ccache
+      uses: actions/cache@v6
+      with:
+        path: ~/.ccache
+        key: ${{ runner.os }}-ccache-${{ github.ref_name }}
+        restore-keys: |
+          ${{ runner.os }}-ccache-
+
     - name: Install Latest CMake
       uses: lukka/get-cmake@latest
       with:
         cmakeVersion: '4.3.2'
+
     - name: Set up JDK 25
       uses: actions/setup-java@v6
       with:
         distribution: 'temurin'
         java-version: '25'
+
     - name: Restore cache
       uses: actions/cache/restore@v6
       with:
         path: ./
         key: ${{ github.sha }}-base
         fail-on-cache-miss: true
+
     - name: Set up environment
       run: |
         GITHUB_ENV_FILE=env.github
         cat "$GITHUB_ENV_FILE" >> $GITHUB_ENV
+
+    - name: Show ccache stats before emulator build
+      run: ccache -s
+
     - name: Create EX-Emulators directory
       run: mkdir EX-Emulators
+
     - name: Build 2600.emu
       if: ${{ matrix.image == '2600.emu' }}
       working-directory: ${{ matrix.image }}
       run: |
+        export CC="ccache gcc"
+        export CXX="ccache g++"
+        export NDK_CC="ccache clang"
+        export NDK_CXX="ccache clang++"
         make -f android.mk android-apk CONFIG=Release V=1 -j`nproc`
         cp build/android/build/outputs/apk/release/2600Emu-release.apk "../EX-Emulators/2600Emu-${COMMIT_PREFIX}.apk"
+
     - name: Build C64.emu
       if: ${{ matrix.image == 'C64.emu' }}
       working-directory: ${{ matrix.image }}
       run: |
+        export CC="ccache gcc"
+        export CXX="ccache g++"
+        export NDK_CC="ccache clang"
+        export NDK_CXX="ccache clang++"
         make -f android.mk android-apk CONFIG=Release V=1 -j`nproc`
         cp build/android/build/outputs/apk/release/C64Emu-release.apk "../EX-Emulators/C64Emu-${COMMIT_PREFIX}.apk"
+
     - name: Build GBA.emu
       if: ${{ matrix.image == 'GBA.emu' }}
       working-directory: ${{ matrix.image }}
       run: |
+        export CC="ccache gcc"
+        export CXX="ccache g++"
+        export NDK_CC="ccache clang"
+        export NDK_CXX="ccache clang++"
         make -f android.mk android-apk CONFIG=Release V=1 -j`nproc`
         cp build/android/build/outputs/apk/release/GbaEmu-release.apk "../EX-Emulators/GbaEmu-${COMMIT_PREFIX}.apk"
+
     - name: Build GBC.emu
       if: ${{ matrix.image == 'GBC.emu' }}
       working-directory: ${{ matrix.image }}
       run: |
+        export CC="ccache gcc"
+        export CXX="ccache g++"
+        export NDK_CC="ccache clang"
+        export NDK_CXX="ccache clang++"
         make -f android.mk android-apk CONFIG=Release V=1 -j`nproc`
         cp build/android/build/outputs/apk/release/GbcEmu-release.apk "../EX-Emulators/GbcEmu-${COMMIT_PREFIX}.apk"
+
     - name: Build Lynx.emu
       if: ${{ matrix.image == 'Lynx.emu' }}
       working-directory: ${{ matrix.image }}
       run: |
+        export CC="ccache gcc"
+        export CXX="ccache g++"
+        export NDK_CC="ccache clang"
+        export NDK_CXX="ccache clang++"
         make -f android.mk android-apk CONFIG=Release V=1 -j`nproc`
         cp build/android/build/outputs/apk/release/LynxEmu-release.apk "../EX-Emulators/LynxEmu-${COMMIT_PREFIX}.apk"
+
     - name: Build MD.emu
       if: ${{ matrix.image == 'MD.emu' }}
       working-directory: ${{ matrix.image }}
       run: |
+        export CC="ccache gcc"
+        export CXX="ccache g++"
+        export NDK_CC="ccache clang"
+        export NDK_CXX="ccache clang++"
         make -f android.mk android-apk CONFIG=Release V=1 -j`nproc`
         cp build/android/build/outputs/apk/release/MdEmu-release.apk "../EX-Emulators/MdEmu-${COMMIT_PREFIX}.apk"
+
     - name: Build MSX.emu
       if: ${{ matrix.image == 'MSX.emu' }}
       working-directory: ${{ matrix.image }}
       run: |
+        export CC="ccache gcc"
+        export CXX="ccache g++"
+        export NDK_CC="ccache clang"
+        export NDK_CXX="ccache clang++"
         make -f android.mk android-apk CONFIG=Release V=1 -j`nproc`
         cp build/android/build/outputs/apk/release/MsxEmu-release.apk "../EX-Emulators/MsxEmu-${COMMIT_PREFIX}.apk"
+
     - name: Build NEO.emu
       if: ${{ matrix.image == 'NEO.emu' }}
       working-directory: ${{ matrix.image }}
       run: |
+        export CC="ccache gcc"
+        export CXX="ccache g++"
+        export NDK_CC="ccache clang"
+        export NDK_CXX="ccache clang++"
         make -f android.mk android-apk CONFIG=Release V=1 -j`nproc`
         cp build/android/build/outputs/apk/release/NeoEmu-release.apk "../EX-Emulators/NeoEmu-${COMMIT_PREFIX}.apk"
+
     - name: Build NES.emu
       if: ${{ matrix.image == 'NES.emu' }}
       working-directory: ${{ matrix.image }}
       run: |
+        export CC="ccache gcc"
+        export CXX="ccache g++"
+        export NDK_CC="ccache clang"
+        export NDK_CXX="ccache clang++"
         make -f android.mk android-apk CONFIG=Release V=1 -j`nproc`
         cp build/android/build/outputs/apk/release/NesEmu-release.apk "../EX-Emulators/NesEmu-${COMMIT_PREFIX}.apk"
+
     - name: Build NGP.emu
       if: ${{ matrix.image == 'NGP.emu' }}
       working-directory: ${{ matrix.image }}
       run: |
+        export CC="ccache gcc"
+        export CXX="ccache g++"
+        export NDK_CC="ccache clang"
+        export NDK_CXX="ccache clang++"
         make -f android.mk android-apk CONFIG=Release V=1 -j`nproc`
         cp build/android/build/outputs/apk/release/NgpEmu-release.apk "../EX-Emulators/NgpEmu-${COMMIT_PREFIX}.apk"
+
     - name: Build PCE.emu
       if: ${{ matrix.image == 'PCE.emu' }}
       working-directory: ${{ matrix.image }}
       run: |
+        export CC="ccache gcc"
+        export CXX="ccache g++"
+        export NDK_CC="ccache clang"
+        export NDK_CXX="ccache clang++"
         make -f android.mk android-apk CONFIG=Release V=1 -j`nproc`
         cp build/android/build/outputs/apk/release/PceEmu-release.apk "../EX-Emulators/PceEmu-${COMMIT_PREFIX}.apk"
+
     - name: Build Snes9x
       if: ${{ matrix.image == 'Snes9x' }}
       working-directory: ${{ matrix.image }}
       run: |
+        export CC="ccache gcc"
+        export CXX="ccache g++"
+        export NDK_CC="ccache clang"
+        export NDK_CXX="ccache clang++"
         make -f android.mk android-apk CONFIG=Release V=1 -j`nproc`
         cp build/android/build/outputs/apk/release/Snes9xEXPlus-release.apk "../EX-Emulators/Snes9xEXPlus-${COMMIT_PREFIX}.apk"
+
     - name: Build Snes9x-1.43-9
       if: ${{ matrix.image == 'Snes9x-1.43' }}
       working-directory: Snes9x/1.43
       run: |
+        export CC="ccache gcc"
+        export CXX="ccache g++"
+        export NDK_CC="ccache clang"
+        export NDK_CXX="ccache clang++"
         make -f android.mk android-apk V=1 -j`nproc`
         cp build/android/build/outputs/apk/release/Snes9xEX-release.apk "../../EX-Emulators/Snes9xEX-${COMMIT_PREFIX}.apk"
+
     - name: Build Swan.emu
       if: ${{ matrix.image == 'Swan.emu' }}
       working-directory: ${{ matrix.image }}
       run: |
+        export CC="ccache gcc"
+        export CXX="ccache g++"
+        export NDK_CC="ccache clang"
+        export NDK_CXX="ccache clang++"
         make -f android.mk android-apk CONFIG=Release V=1 -j`nproc`
         cp build/android/build/outputs/apk/release/SwanEmu-release.apk "../EX-Emulators/SwanEmu-${COMMIT_PREFIX}.apk"
+
     - name: Build Saturn.emu
       if: ${{ matrix.image == 'Saturn.emu' }}
       working-directory: ${{ matrix.image }}
       run: |
+        export CC="ccache gcc"
+        export CXX="ccache g++"
+        export NDK_CC="ccache clang"
+        export NDK_CXX="ccache clang++"
         make -f android.mk android-apk CONFIG=Release V=1 -j`nproc`
         cp build/android/build/outputs/apk/release/SaturnEmu-release.apk "../EX-Emulators/SaturnEmu-${COMMIT_PREFIX}.apk"
+
+    - name: Show ccache stats after emulator build
+      run: ccache -s
+
     - name: Upload EX-Emulators artifacts
       uses: actions/upload-artifact@v7
       with:
@@ -209,11 +345,13 @@ jobs:
       uses: actions/checkout@v7
       with:
         fetch-depth: 0
+
     - name: Download Artifacts
       uses: actions/download-artifact@v8
       with:
         path: EX-Emulators
         merge-multiple: true
+
     - name: Re-ZIP artifacts
       working-directory: EX-Emulators
       run: |
@@ -226,12 +364,13 @@ jobs:
           zip "../dist/${file_name//-${COMMIT_PREFIX}/}.zip" "${file_name}.apk"
         done
         zip -r "../dist/EX-Emulators.zip" *.apk
+
     - name: Update Git Tag
       run: |
         git tag -f Pre-release
         git push -f origin Pre-release
+
     - name: Create Release
-      # v1.16.0
       uses: ncipollo/release-action@440c8c1cb0ed28b9f43e4d1d670870f059653174
       with:
         prerelease: true
