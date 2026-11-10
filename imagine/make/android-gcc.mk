@@ -32,10 +32,21 @@ ifneq ($(wildcard $(ANDROID_NDK_PATH)/sysroot),)
  $(error your NDK contains a deprecated sysroot directory, please upgrade to at least r23)
 endif
 
-ifneq ($(filter 9 16, $(android_ndkSDK)),)
+# Select the bundled compatibility sysroot from the host triplet:
+# i686-linux-android (x86)  -> API 16
+# arm-linux-androideabi (armv7) -> API 9
+ifneq ($(findstring i686, $(CHOST)),)
+ a_sdk := 16
+else ifneq ($(findstring arm, $(CHOST)),)
+ a_sdk := 9
+else
+ a_sdk := $(android_ndkSDK)
+endif
+
+ifneq ($(filter 9 16, $(a_sdk)),)
  # SDK 9 no longer supported since NDK r16 & SDK 16 since NDK r24, use bundled system lib stubs
- CPPFLAGS += -DANDROID_COMPAT_API=$(android_ndkSDK)
- android_ndkLinkSysroot := $(IMAGINE_PATH)/bundle/android/$(CHOST)/$(android_ndkSDK)
+ CPPFLAGS += -DANDROID_COMPAT_API=$(a_sdk)
+ android_ndkLinkSysroot := $(IMAGINE_PATH)/bundle/android/$(CHOST)/$(a_sdk)
 endif
 
 ifdef android_ndkLinkSysroot

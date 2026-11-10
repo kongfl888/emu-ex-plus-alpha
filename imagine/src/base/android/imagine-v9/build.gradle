@@ -4,7 +4,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:9.0.0'
+        classpath 'com.android.tools.build:gradle:9.2.0'
     }
 }
 
@@ -21,7 +21,7 @@ android {
     compileSdk 36
 
     defaultConfig {
-        minSdkVersion 9
+        minSdkVersion 19
         targetSdkVersion 36
     }
 

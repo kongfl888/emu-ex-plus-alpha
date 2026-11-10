@@ -23,7 +23,7 @@ endif
 
 # SDK level setup
 
-android_minSDK ?= 9
+android_minSDK ?= 19
 
 # Architecture setup
 

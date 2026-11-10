@@ -30,10 +30,20 @@ if(NOT IS_DIRECTORY ${ANDROID_CLANG_SYSROOT_PATH})
 	message(FATAL_ERROR "ANDROID_CLANG_SYSROOT_PATH not found in NDK or in ANDROID_CLANG_TOOLCHAIN_PATH: ${ANDROID_CLANG_TOOLCHAIN_PATH}")
 endif()
 
-if(ANDROID_NDK_SDK LESS_EQUAL 16)
-	# SDK 9 no longer supported since NDK r16 & SDK 16 since NDK r24, use bundled system lib stubs
-	string(APPEND CFLAGS_COMMON " -DANDROID_COMPAT_API=${ANDROID_NDK_SDK}")
-	set(android_ndkLinkSysroot "${IMAGINE_PATH}/bundle/android/${CTARGET}/${ANDROID_NDK_SDK}")
+# Determine API level based on architecture
+if("${CTARGET}" MATCHES "i686") # x86
+	set(_API 16)
+elseif("${CTARGET}" MATCHES "arm") # arm64-v8a <- aarch64
+	set(_API 9)
+else()
+	set(_API ${ANDROID_NDK_SDK})
+endif()
+
+# Apply legacy settings only for low API levels
+# SDK 9 no longer supported since NDK r16 & SDK 16 since NDK r24, use bundled system lib stubs
+if(_API LESS_EQUAL 16)
+	string(APPEND CFLAGS_COMMON " -DANDROID_COMPAT_API=${_API}")
+	set(android_ndkLinkSysroot "${IMAGINE_PATH}/bundle/android/${CTARGET}/${_API}")
 	set(ANDROID_COMPAT_API 1)
 endif()
 
