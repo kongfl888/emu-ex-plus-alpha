@@ -4,7 +4,8 @@ endif
 
 include $(buildSysPath)/imagineSDKPath.mk
 
-libsndfileVer := 1.0.31
+# Dev version 1.2.2 (master-g396a715)
+libsndfileVer := 1.2.2
 libsndfileSrcDir := $(tempDir)/libsndfile-$(libsndfileVer)
 libsndfileSrcArchive := libsndfile-$(libsndfileVer).tar.gz
 
